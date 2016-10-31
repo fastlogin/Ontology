@@ -112,7 +112,7 @@ public class Ontology {
 	 * Holds the topic it represents, a literal representation of all the
 	 * questions for the topic in a stack, the questions in the topic
 	 * represented by a QuestionTrie, the depth of the topic in terms of how
-	 * far it is from the root topic, and list of children nodes.
+	 * far it is from the root topic, and a list of children nodes.
 	 * 
 	 * @author George Ding
 	 */
@@ -134,8 +134,8 @@ public class Ontology {
 			this.depth = depth;
 		}
 
-		// Function to record question for topic by adding it to
-		// the questionsLiteral Stack.
+		// Function to record a question for the topic by adding 
+		// it to the questionsLiteral Stack.
 		void addQuestion(String question) {
 			this.questionsLiteral.push(question);
 		}
@@ -143,14 +143,14 @@ public class Ontology {
 	
 	/**
 	 * Iterative function to take a flattened string representation of a topic
-	 * tree and builds the topic ontology tree. Returns the tree as a map from
+	 * ontology and builds the topic ontology tree. Returns the tree as a map from
 	 * topic to its node in the tree. The map will be the only access point to the
 	 * tree so that the structure of the tree is hidden in memory and access to
-	 * any nodes will be a constant O(1) operation. 
+	 * any node will be a constant O(1) operation. 
 	 * 
-	 * @param flattenedTree: Flattened String representation of the topic tree
+	 * @param flattenedTree: Flattened String representation of the topic ontology.
 	 * @param topicTreeMap: Tree map mapping topic to the corresponding topic node
-	 * in the ontology tree.
+	 * in the topic ontology tree.
 	 */
 	static void buildTopicOntologyTreeHelper(
 			String[] flattenedTree,
@@ -239,7 +239,7 @@ public class Ontology {
 	
 	/**
 	 * Function to merge two QuestionTries. Combines counts of shared nodes and
-	 * adds nodes from child to parent that parent does not have.
+	 * adds nodes from child to the parent that the parent does not have.
 	 * 
 	 * @param parentTrie: Parent trie to be merged into.
 	 * @param childTrie: Child trie to consume.
@@ -278,6 +278,7 @@ public class Ontology {
 		Queue<TopicTreeNode> bfsFrontier = new LinkedList<>();
 		bfsFrontier.add(topicSubTreeRoot);
 		QuestionTrie currTrie = new QuestionTrie();
+		
 		while (!bfsFrontier.isEmpty()) {
 			
 			TopicTreeNode currChildTopic = bfsFrontier.remove();
@@ -356,7 +357,7 @@ public class Ontology {
 	}
 	
 	/**
-	 * Parent wrapped function to perform the final operations for Ontology.
+	 * Parent wrapper function to perform the final operations for Ontology.
 	 * Process each query and record the results in order.
 	 * 
 	 * @param topicOntology: The topic ontology
