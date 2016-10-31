@@ -154,8 +154,9 @@ public class Ontology {
 	 */
 	static void buildTopicOntologyTreeHelper(
 			String[] flattenedTree,
-			Map<String, TopicTreeNode> topicTreeMap) {
-		
+			Map<String, TopicTreeNode> topicTreeMap) 
+	{
+		// Stack to keep track of parent nodes.
 		Stack<TopicTreeNode> parentStack = new Stack<>();
 		
 		// Initialize root node in tree. This is the node above the root topic.
@@ -215,18 +216,34 @@ public class Ontology {
 		topicOntologyTreeMap.get(topic).addQuestion(question);
 	}
 	
+	/**
+	 * Recursive helper function to help merge two tries.
+	 * 
+	 * @param parentNode: Current node of the parent trie that is being merged into.
+	 * @param childNode: Current node of the child trie that is being consumed.
+	 */
 	static void mergeTrieHelper(QuestionTrieNode parentNode, QuestionTrieNode childNode) {
 		
 		parentNode.questionCount += childNode.questionCount;
 		for (Character childsChild : childNode.children.keySet()) {
+			
+			// If parent has this prefix node, we continue to recurse on that node.
 			if (parentNode.children.keySet().contains(childsChild)) {
 				mergeTrieHelper(parentNode.children.get(childsChild), childNode.children.get(childsChild));
 			} else {
+				// If parent does not have the node, add it in from the child.
 				parentNode.children.put(childsChild, childNode.children.get(childsChild));
 			}
 		}
 	}
 	
+	/**
+	 * Function to merge two QuestionTries. Combines counts of shared nodes and
+	 * adds nodes from child to parent that parent does not have.
+	 * 
+	 * @param parentTrie: Parent trie to be merged into.
+	 * @param childTrie: Child trie to consume.
+	 */
 	static void mergeTrie(QuestionTrie parentTrie, QuestionTrie childTrie) {
 		mergeTrieHelper(parentTrie.root, childTrie.root);
 	}
@@ -235,21 +252,25 @@ public class Ontology {
 	 * Breadth First Search helper function for processQuery that searches
 	 * through every child topic of a given topic subtree to find the
 	 * aggregate count for the number of times a certain question prefix
-	 * is seen.
+	 * is seen. Does this by adding all of the children's questions from their
+	 * questionsLiteral stack to a trie and merging any child tries along the 
+	 * way. The query is then performed on the final trie built and that trie
+	 * is set as the current topic's TopicTreeNode's QuestionTrie.
 	 * 
-	 * @param topicOntologyTreeMap
-	 * @param topic
-	 * @param questionPrefix
-	 * @return
+	 * @param topicOntologyTreeMap: Tree map for the topic ontology tree.
+	 * @param topic: The topic of the current query.
+	 * @param questionPrefix: The question prefix of the current query.
+	 * @return The count for the query defined by topic, questionPrefix.
 	 */
 	static int bfsQuestionPrefix(
 			Map<String, TopicTreeNode> topicOntologyTreeMap,
 			String topic, 
 			String questionPrefix)
 	{
-		
+		// Get the node from the tree for this topic.
 		TopicTreeNode topicSubTreeRoot = topicOntologyTreeMap.get(topic);
 		
+		// If the trie for this topic is already built, answer the query.
 		if (topicSubTreeRoot.questions != null) {
 			return topicSubTreeRoot.questions.getQuestionPrefixCount(questionPrefix);
 		}
@@ -258,18 +279,28 @@ public class Ontology {
 		bfsFrontier.add(topicSubTreeRoot);
 		QuestionTrie currTrie = new QuestionTrie();
 		while (!bfsFrontier.isEmpty()) {
+			
 			TopicTreeNode currChildTopic = bfsFrontier.remove();
+			
+			// If a child's trie is not null, merge it with the current trie, currTrie.
 			if (currChildTopic.questions != null) {
 				mergeTrie(currTrie, currChildTopic.questions);
+				
+				// Set the child trie to null once it is consumed since we do not need
+				// it anymore; saves memory since this is the only pointer to it.
 				currChildTopic.questions = null;
 				continue;
 			}
+			// Consume all of the child's questions from its questionsLiteral stack.
 			while(!currChildTopic.questionsLiteral.isEmpty()) {
 				currTrie.addQuestion(currChildTopic.questionsLiteral.pop());
 			}
 			bfsFrontier.addAll(currChildTopic.children);
 		}
+		
+		// Set the current topic's TopicTreeNode's QuestionTrie to currTrie.
 		topicSubTreeRoot.questions = currTrie;
+		// Answer the query.
 		return currTrie.getQuestionPrefixCount(questionPrefix);
 	}
 
@@ -278,8 +309,8 @@ public class Ontology {
 	 * how many questions in a given topic start with a certain question prefix.
 	 * 
 	 * @param topicOntologyTreeMap: The topic ontology
-	 * @param query: "Topic Question Prefix"
-	 * @return The number of questions in the topic that start with a given question prefix
+	 * @param query: "Topic QuestionPrefix"
+	 * @return The number of questions in the topic that start with a given question prefix.
 	 */
 	static int processQuery(
 			Map<String, TopicTreeNode> topicOntologyTreeMap,
@@ -291,11 +322,26 @@ public class Ontology {
 		return bfsQuestionPrefix(topicOntologyTreeMap, topic, questionPrefix);
 	}
 	
+	/**
+	 * Create a pseudo ordering of the queries based on their topic's depth
+	 * in relation to the root topic. We want to process the deepest queries first.
+	 * We create this ordering without sorting by indexing an array to the depths, storing
+	 * a list at each array index for all the queries at that depth. We also maintain
+	 * an ordering of when each query came in so we can print the results in order. We do
+	 * this by having a map from query to its orderings, the ordering is expressed as a queue
+	 * to account for duplicate queries.
+	 * 
+	 * @param topicOntology: The topic ontology
+	 * @param ordered: Map of query to the order(s) in which it came in
+	 * @param sorted: Pseudo ordering of queries by depth.
+	 * @param query: The current query
+	 * @param order: The current query ordering, the "ith" query
+	 */
 	static void orderQuery(
-			List<String>[] sorted, 
-			Map<String, Queue<Integer>> ordered, 
-			String query, 
 			Map<String, TopicTreeNode> topicOntology,
+			Map<String, Queue<Integer>> ordered,
+			List<String>[] sorted,
+			String query, 
 			int order)
 	{
 		int ordering = topicOntology.get(query.substring(0,query.indexOf(' '))).depth;
@@ -309,15 +355,25 @@ public class Ontology {
 		ordered.get(query).add(order);
 	}
 	
+	/**
+	 * Parent wrapped function to perform the final operations for Ontology.
+	 * Process each query and record the results in order.
+	 * 
+	 * @param topicOntology: The topic ontology
+	 * @param ordered: Map of query to the order(s) in which it came in
+	 * @param sorted: Pseudo ordering of queries by depth.
+	 * @param results: Query results in order specified by ordered, the order of the input.
+	 */
 	static void doOntology(
-			List<String>[] sorted, 
+			Map<String, TopicTreeNode> topicOntology,  
 			Map<String, Queue<Integer>> ordered,
-			Map<String, TopicTreeNode> topicOntology, 
+			List<String>[] sorted,
 			int[] results)
 	{
 		for (int i = sorted.length-1; i>=0; i--) {
 			if (sorted[i] != null) {
 				for (String query : sorted[i]) {
+					// Set the next ordering of this query to the result.
 					results[ordered.get(query).remove()] = processQuery(topicOntology, query);
 				}
 			}
@@ -326,26 +382,47 @@ public class Ontology {
 
 	public static void main(String[] args) throws Exception {
 		
+		// 1. Initialize IO stuff.
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
         PrintWriter writer = new PrintWriter(System.out);
+        
+        // 2. Get number of topics.
         int N = Integer.parseInt(br.readLine());
+        
+        // 3. Get flattened topic tree.
         String flattenedTree = br.readLine();
+        
+        // 4. Build our tree map.
         Map<String, TopicTreeNode> topicOntology = buildTopicOntology(flattenedTree);
+        
+        // 5. Get number of questions.
         int M = Integer.parseInt(br.readLine());
+        
+        // 6. Add all questions to our topic ontology tree.
         for (int i = 0; i < M; i++) {
         	addQuestionToTopic(topicOntology, br.readLine());
 		}
+        
+        // 7. Get number of queries.
         int K = Integer.parseInt(br.readLine());
         List<String>[] sortedQueries = (ArrayList<String> []) new ArrayList[N];
         Map<String, Queue<Integer>> orderedQueries = new HashMap<>();
+        
+        // 8. Create ordering for the queries based on depth.
         for (int j = 0; j < K; j++) {
-        	orderQuery(sortedQueries, orderedQueries, br.readLine(), topicOntology, j);
+        	orderQuery(topicOntology, orderedQueries, sortedQueries, br.readLine(), j);
 		}
+        
+        // 9. Process all queries, deepest first.
         int[] results = new int[K];
-        doOntology(sortedQueries, orderedQueries, topicOntology, results);
+        doOntology(topicOntology, orderedQueries, sortedQueries, results);
+        
+        // 10. Print query results in the same order they came in.
         for (int res : results) {
         	writer.println(res);
         }
+        
+        // 11. We are done, close IO.
         writer.flush();
         writer.close();
 	}
